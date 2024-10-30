@@ -91,29 +91,82 @@ var repl = [][]string{
 	{"M", "миллиардов "},
 }
 
+var currencyRepl = []string{"рубль", "рубля", "рублей"}
+
 var mask = []string{",,,", ",,", ",", ",,,,", ",,", ",", ",,,,,", ",,", ",", ",,,,,,", ",,", ","}
 
+type params struct {
+	upperFirst   bool
+	withFraction bool
+	withCurrency bool
+}
+
+type RuMoneyOption func(*params)
+
+func WithUpperFirst(v bool) RuMoneyOption {
+	return func(p *params) {
+		p.upperFirst = v
+	}
+}
+
+func WithFraction(v bool) RuMoneyOption {
+	return func(p *params) {
+		p.withFraction = v
+	}
+}
+
+func WithCurrency(v bool) RuMoneyOption {
+	return func(p *params) {
+		if v == false {
+			p.withFraction = false
+		}
+		p.withCurrency = v
+	}
+}
+
 // RuMoney - деньги прописью на русском
-func RuMoney(number float64, upperFirstChar bool) string {
+func RuMoney(number float64, opts ...RuMoneyOption) string {
+	p := params{
+		upperFirst:   false,
+		withFraction: true,
+		withCurrency: true,
+	}
+	for _, opt := range opts {
+		opt(&p)
+	}
 
 	s := fmt.Sprintf("%.2f", number)
 	l := len(s)
 
-	dest := s[l-3:l] + "k"
+	var dest string
+	if p.withFraction {
+		dest = s[l-3:l] + "k"
+	} else {
+		dest = "."
+	}
+
 	s = s[:l-3]
 	l = len(s)
+
 	for i := l; i > 0; i-- {
 		c := string(s[i-1])
 		dest = c + mask[l-i] + dest
 	}
 
 	for _, r := range repl {
-		dest = strings.Replace(dest, r[0], r[1], -1)
+		dest = strings.ReplaceAll(dest, r[0], r[1])
 	}
-	if upperFirstChar {
+
+	if !p.withCurrency {
+		for _, cur := range currencyRepl {
+			dest = strings.ReplaceAll(dest, cur, "")
+		}
+	}
+
+	if p.upperFirst {
 		a := []rune(dest)
 		a[0] = unicode.ToUpper(a[0])
 		dest = string(a)
 	}
-	return dest
+	return strings.TrimSpace(dest)
 }
